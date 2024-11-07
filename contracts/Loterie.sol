@@ -1,25 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.27;
+pragma solidity ^0.8.0;
 
-import "@chainlink/contracts/src/v0.8/vrf/VRFConsumerBase.sol";
-
-contract Loterie is VRFConsumerBase {
+contract Loterie {
     address public owner;
     address[] public participants;
     address public gagnant;
-    uint256 public dernierTirage;
-    bytes32 internal keyHash;
-    uint256 internal fee; // Montant en LINK pour Chainlink VRF (0.1 LINK);
 
-    constructor(
-        address _vrfCoordinator,
-        address _linkToken,
-        bytes32 _keyHash,
-        uint256 _fee
-    ) VRFConsumerBase(_vrfCoordinator, _linkToken) {
+    constructor() {
         owner = msg.sender;
-        keyHash = _keyHash;
-        fee = _fee;
     }
 
     modifier uniquementProprietaire() {
@@ -38,36 +26,30 @@ contract Loterie is VRFConsumerBase {
         participants.push(msg.sender);
     }
 
-    // Fonction pour lancer le tirage, nécessite des frais LINK pour Chainlink VRF
-    function lancerTirage()
-        public
-        uniquementProprietaire
-        returns (bytes32 requestId)
-    {
-        require(
-            participants.length > 0, // Vérifie qu'il y a des participants
-            "Aucun participant dans le tirage"
-        );
+    function lancerTirage() public {
+        require(participants.length > 0, "Aucun participant dans le tirage");
 
-        // Vérifie si le contrat a suffisamment de LINK pour le tirage
-        require(
-            LINK.balanceOf(address(this)) >= fee, // Par exemple 0.1 LINK pour la requête VRF
-            "Pas assez de LINK pour utiliser Chainlink VRF"
-        );
+        uint256 indexGagnant = random() % participants.length;
+        gagnant = participants[indexGagnant];
 
-        // Demande un nombre aléatoire à Chainlink
-        requestId = requestRandomness(keyHash, fee); // Frais Chainlink en LINK
-        dernierTirage = block.timestamp;
+        // Transférer le solde du contrat au gagnant
+        payable(gagnant).transfer(address(this).balance);
+
+        // Réinitialiser les participants pour un nouveau tirage
+        delete participants;
     }
 
-    function fulfillRandomness(
-        bytes32 requestId,
-        uint256 randomness
-    ) internal override {
-        uint256 indexGagnant = randomness % participants.length;
-        gagnant = participants[indexGagnant];
-        payable(gagnant).transfer(address(this).balance);
-        delete participants;
+    function random() private view returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        block.prevrandao,
+                        block.timestamp,
+                        participants
+                    )
+                )
+            );
     }
 
     function recupererParticipants() public view returns (address[] memory) {

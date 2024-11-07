@@ -3,17 +3,10 @@ const { ethers } = require("hardhat");
 
 async function main() {
   try {
-
     const Loterie = await ethers.getContractFactory("Loterie");
     console.log("Contract factory created:", Loterie);
 
-    const loterie = await Loterie.deploy(
-      process.env.VRF_COORDINATOR,
-      process.env.LINK_TOKEN_ADDRESS,
-      process.env.KEY_HASH,
-      process.env.FEE
-    );
-
+    const loterie = await Loterie.deploy();
     console.log("Loterie object:", loterie);
 
     if (!loterie.deployTransaction) {
